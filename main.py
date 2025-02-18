@@ -26,9 +26,10 @@ class GUI:
         self.manager.draw_ui(surf)
 
     def process_event(self, event):
+        self.manager.process_events(event)
         if event.type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
             if event.ui_elemrnt == self.theme_toggle:
-                print(self.theme_toggle)
+                print('Тема')
 
 
 class MapApp:
@@ -76,7 +77,7 @@ class MapApp:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     exit(0)
-                self.gui.manager.process_events(event)
+                self.gui.process_event(event)
                 self.process_keys(event)
 
             self.gui.update(time_delta)
