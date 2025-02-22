@@ -1,5 +1,6 @@
 import io
 import sys
+
 import pygame
 import pygame_gui
 from io import BytesIO
@@ -14,9 +15,18 @@ class GUI:
         self.manager = pygame_gui.UIManager(size)
         self.theme_toggle = pygame_gui.elements.UIDropDownMenu(
             MapApp.THEMES,
-            MapApp.THEMES[theme],
+            MapApp.THEMES[0],
             pygame.rect.Rect(10, 10, 100, 30),
-            self.manager,
+            self.manager
+        )
+        self.search_field = pygame_gui.elements.UITextEntryLine(
+            pygame.rect.Rect(120, 10, 200, 30),
+            self.manager
+        )
+        self.submit_btn = pygame_gui.elements.UIButton(
+            pygame.rect.Rect(330, 10, 80, 30),
+            'Искать',
+            self.manager
         )
 
     def update(self, td):
@@ -27,33 +37,45 @@ class GUI:
 
     def process_event(self, event):
         self.manager.process_events(event)
+        changes = {}
         if event.type == pygame_gui.UI_DROP_DOWN_MENU_CHANGED:
-            if event.ui_elemrnt == self.theme_toggle:
-                print('Тема')
+            if event.ui_element == self.theme_toggle:
+                changes['theme'] = event.text
+        if (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN or
+                event.type == pygame_gui.UI_BUTTON_PRESSED and event.ui_element == self.submit_btn):
+            changes['search'] = self.search_field.text
+        return changes
 
 
 class MapApp:
     DELTA_LON = 200
     DELTA_LAT = 90
-    THEMES = ['light', 'dark']
+    THEMES = 'light', 'dark'
+    KEYS = (pygame.K_UP, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT,
+            pygame.K_PAGEDOWN, pygame.K_PAGEUP)
 
     def __init__(self, size):
         pygame.init()
         self.screen = pygame.display.set_mode(size)
         self.z = 1
         self.coord = [0, 0]
-        self.theme = 0
+        self.theme = MapApp.THEMES[0]
+        self.point = None
+        self.spn = None
+        self.img = None
         self.update_map()
         self.clock = pygame.time.Clock()
         self.gui = GUI(size, self.theme)
 
     def update_map(self):
-        bytes_img = get_static_map(ll=','.join(map(str, self.coord)), z=self.z, theme=MapApp.THEMES[self.theme])
-        img = pygame.image.load(BytesIO(bytes_img))
-        self.screen.blit(img, (0, 0))
+        bytes_img = get_static_map(ll=','.join(map(str, self.coord)), spn=self.spn, z=self.z, theme=self.theme,
+                                   pt=self.point)
+        self.img = pygame.image.load(BytesIO(bytes_img))
+        self.screen.blit(self.img, (0, 0))
 
     def process_keys(self, event):
-        if event.type == pygame.KEYDOWN:
+        if event.type == pygame.KEYDOWN and event.key in MapApp.KEYS:
+            self.spn = None
             if event.key == pygame.K_PAGEUP:
                 self.z = min(21, self.z + 1)
             if event.key == pygame.K_PAGEDOWN:
@@ -66,9 +88,25 @@ class MapApp:
                 self.coord[1] = min((self.coord[1] + MapApp.DELTA_LAT * 2 ** -self.z), 85)
             if event.key == pygame.K_DOWN:
                 self.coord[1] = max((self.coord[1] - MapApp.DELTA_LAT * 2 ** -self.z), -85)
-            if event.key == pygame.K_t:
-                self.theme = 1 - self.theme
+            return True
+
+    def process_event(self, event):
+        keys = self.process_keys(event)
+        results = self.gui.process_event(event)
+        self.theme = results.get('theme') or self.theme
+        if keys or results:
+            addr = results.get('search') or False
+            if addr:
+                self.search_map(addr)
             self.update_map()
+
+    def search_map(self, addr):
+        toponym = get_toponym(addr)
+        self.spn = get_spn(toponym)
+        print(toponym, self.spn)
+        coord = get_toponym_coord(toponym)
+        self.point = ','.join(map(str, coord)) + ',pm2dgl'
+        self.coord = list(map(float, coord))
 
     def run(self):
         while True:
@@ -77,9 +115,9 @@ class MapApp:
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     exit(0)
-                self.gui.process_event(event)
-                self.process_keys(event)
+                self.process_event(event)
 
+            self.screen.blit(self.img, (0, 0))
             self.gui.update(time_delta)
             self.gui.draw_ui(self.screen)
 
