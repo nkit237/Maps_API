@@ -28,6 +28,11 @@ class GUI:
             'Искать',
             self.manager
         )
+        self.clear_btn = pygame_gui.elements.UIButton(
+            pygame.rect.Rect(420, 10, 80, 30),
+            'Сброс',
+            self.manager
+        )
 
     def update(self, td):
         self.manager.update(td)
@@ -44,6 +49,8 @@ class GUI:
         if (event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN or
                 event.type == pygame_gui.UI_BUTTON_PRESSED and event.ui_element == self.submit_btn):
             changes['search'] = self.search_field.text
+        if event.type == pygame_gui.UI_BUTTON_PRESSED and event.ui_element == self.clear_btn:
+            changes['search'] = 'clear'
         return changes
 
 
@@ -97,13 +104,15 @@ class MapApp:
         if keys or results:
             addr = results.get('search') or False
             if addr:
-                self.search_map(addr)
+                if addr == 'clear':
+                    self.point = None
+                else:
+                    self.search_map(addr)
             self.update_map()
 
     def search_map(self, addr):
         toponym = get_toponym(addr)
         self.spn = get_spn(toponym)
-        print(toponym, self.spn)
         coord = get_toponym_coord(toponym)
         self.point = ','.join(map(str, coord)) + ',pm2dgl'
         self.coord = list(map(float, coord))
